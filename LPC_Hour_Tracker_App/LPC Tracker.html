@@ -177,6 +177,11 @@
   details summary { cursor: pointer; font-weight: 600; margin-top: 16px; }
   .settings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
 
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(10, 15, 25, .45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .modal { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 20px; max-width: 420px; width: 100%; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+  .modal p { margin: 0 0 16px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  .modal-actions .primary.danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; }
   .toast {
     position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
     background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px;
@@ -284,7 +289,7 @@
         </label>
 
         <div class="form-actions">
-          <button type="submit" class="primary" id="submitBtn">Add to log</button>
+          <button type="button" class="primary" id="submitBtn">Add to log</button>
           <button type="button" id="cancelEdit" hidden>Cancel</button>
         </div>
       </form>
@@ -366,6 +371,16 @@
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<div class="modal-backdrop" id="confirmModal" hidden>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirmText">
+    <p id="confirmText"></p>
+    <div class="modal-actions">
+      <button type="button" id="confirmCancel">Cancel</button>
+      <button type="button" class="primary" id="confirmOk">OK</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function () {
@@ -645,6 +660,27 @@
   }
 
   // ---------- form ----------
+  // In-page confirmation (browser confirm() pop-ups are blocked in some previews).
+  var confirmCb = null;
+  function ask(message, okLabel, onOk, danger) {
+    $('confirmText').textContent = message;
+    $('confirmOk').textContent = okLabel || 'OK';
+    $('confirmOk').classList.toggle('danger-fill', !!danger);
+    confirmCb = onOk;
+    $('confirmModal').hidden = false;
+    $('confirmCancel').focus();
+  }
+  function closeAsk(ok) {
+    var cb = confirmCb;
+    confirmCb = null;
+    $('confirmModal').hidden = true;
+    if (ok && cb) cb();
+  }
+  $('confirmOk').addEventListener('click', function () { closeAsk(true); });
+  $('confirmCancel').addEventListener('click', function () { closeAsk(false); });
+  $('confirmModal').addEventListener('click', function (ev) { if (ev.target === this) closeAsk(false); });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && !$('confirmModal').hidden) closeAsk(false); });
+
   function selectedType() { return document.querySelector('input[name="type"]:checked').value; }
   function isRange() { return $('m-range').checked; }
   function onTypeChange() {
@@ -713,8 +749,14 @@
     $('hours').focus({ preventScroll: true });
   }
 
-  $('entryForm').addEventListener('submit', function (ev) {
-    ev.preventDefault();
+  // Handled with a click/Enter listener rather than a form submit, so it also works
+  // where form submission is blocked (e.g. sandboxed previews).
+  $('entryForm').addEventListener('submit', function (ev) { ev.preventDefault(); submitEntry(); });
+  $('entryForm').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' && ev.target.tagName === 'INPUT' && ev.target.type !== 'radio') { ev.preventDefault(); submitEntry(); }
+  });
+  $('submitBtn').addEventListener('click', submitEntry);
+  function submitEntry() {
     var type = selectedType();
     var date = $('date').value;
     var endDate = isRange() ? $('endDate').value : '';
@@ -749,7 +791,7 @@
     save();
     resetForm(true);
     renderAll();
-  });
+  }
   $('cancelEdit').addEventListener('click', function () { resetForm(false); });
   document.querySelectorAll('input[name="type"]').forEach(function (r) { r.addEventListener('change', onTypeChange); });
   document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', onModeChange); });
@@ -770,12 +812,13 @@
     if (delId) {
       var e = state.entries.find(function (x) { return x.id === delId; });
       if (!e) return;
-      if (!confirm('Delete ' + fmt(e.hours) + ' ' + TYPES[e.type].label.toLowerCase() + ' hours on ' + entryDateLabel(e) + '?')) return;
-      state.entries = state.entries.filter(function (x) { return x.id !== delId; });
-      if (editingId === delId) resetForm(false);
-      save();
-      renderAll();
-      toast('Entry deleted.');
+      ask('Delete ' + fmt(e.hours) + ' ' + TYPES[e.type].label.toLowerCase() + (e.hours === 1 ? ' hour on ' : ' hours on ') + entryDateLabel(e) + '?', 'Delete', function () {
+        state.entries = state.entries.filter(function (x) { return x.id !== delId; });
+        if (editingId === delId) resetForm(false);
+        save();
+        renderAll();
+        toast('Entry deleted.');
+      }, true);
     }
   });
 
@@ -802,13 +845,15 @@
 
   $('btnClear').addEventListener('click', function () {
     if (!state.entries.length) { toast('There are no entries to delete.'); return; }
-    if (!confirm('Delete ALL ' + state.entries.length + ' entries? Download a backup first if you might want them back.')) return;
-    if (!confirm('Are you sure? This cannot be undone.')) return;
-    state.entries = [];
-    save();
-    resetForm(false);
-    renderAll();
-    toast('All entries deleted.');
+    ask('Delete ALL ' + state.entries.length + ' entries? Download a backup first if you might want them back.', 'Continue', function () {
+      ask('Are you sure? This cannot be undone.', 'Delete everything', function () {
+        state.entries = [];
+        save();
+        resetForm(false);
+        renderAll();
+        toast('All entries deleted.');
+      }, true);
+    }, true);
   });
 
   // ---------- backup / export ----------
@@ -842,16 +887,15 @@
       try { data = JSON.parse(reader.result); } catch (e) { toast('That file isn’t a valid backup.'); return; }
       var incoming = normalize(data);
       if (!incoming.entries.length && !(data && Array.isArray(data.entries))) { toast('That file isn’t a valid backup.'); return; }
-      var msg = 'This backup has ' + incoming.entries.length + ' entries.\n\n' +
-        'OK = Replace everything currently here with the backup\nCancel = Don’t restore';
-      if (!confirm(msg)) return;
-      state.entries = incoming.entries;
-      state.settings = incoming.settings;
-      save();
-      renderSettings();
-      resetForm(false);
-      renderAll();
-      toast('Restored ' + incoming.entries.length + ' entries.');
+      ask('This backup has ' + incoming.entries.length + ' entries. Restoring replaces everything currently in the tracker with the backup.', 'Restore', function () {
+        state.entries = incoming.entries;
+        state.settings = incoming.settings;
+        save();
+        renderSettings();
+        resetForm(false);
+        renderAll();
+        toast('Restored ' + incoming.entries.length + ' entries.');
+      });
     };
     reader.readAsText(file);
   });
