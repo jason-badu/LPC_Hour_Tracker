@@ -1,0 +1,45 @@
+LPC RESIDENCY HOUR TRACKER - HOW TO USE
+=======================================
+
+GETTING STARTED
+1. Save this folder somewhere permanent on your computer (for example, Documents).
+2. Double-click "index.html". It opens in your web browser. No internet or installation needed.
+3. Tip: bookmark the page, or drag it to your bookmarks bar, so it's one click to open.
+   Always open it in the same browser (for example, always Chrome) because that's where your hours are saved.
+
+LOGGING HOURS
+1. Choose the type of hours:
+   - Clinic client      -> counts toward direct client contact (2,000) and total (3,400)
+   - School counseling  -> counts toward direct client contact (2,000) and total (3,400)
+   - Supervision        -> counts toward supervision (200) and total (3,400).
+                           Mark it as Individual or Group.
+   - Other / indirect   -> counts toward the total (3,400) only. Use this for notes, paperwork,
+                           trainings, and other residency work that isn't face-to-face with clients.
+2. Pick the date and enter the hours (use decimals: 0.25 = 15 min, 0.5 = 30 min, 0.75 = 45 min).
+3. Add an optional note (supervisor, site, number of clients). Don't put client names in notes.
+4. Click "Add to log". Everything saves automatically.
+
+To fix a mistake, click "Edit" or "Delete" next to the entry in the Hour log.
+
+KEEPING YOUR HOURS SAFE (IMPORTANT)
+Your hours are saved inside your web browser on this computer. If you clear your browsing data,
+switch browsers, or get a new computer, they won't come with you automatically.
+
+- Click "Download backup" every week or two. It saves a small file (LPC-hours-backup-DATE.json).
+  Email it to yourself or put it in Google Drive, iCloud, or OneDrive.
+- To get your hours back, or to move them to another computer or browser, open the tracker
+  there and click "Restore from backup..." and choose the most recent backup file.
+  (Restoring replaces whatever is currently in the tracker with the backup.)
+
+The tracker will remind you if you haven't backed up in a while.
+
+OTHER FEATURES
+- Export to spreadsheet (CSV): opens in Excel or Google Sheets. Useful for your supervisor
+  or for filling out licensing paperwork.
+- Print / save as PDF: prints your progress and full log.
+- Filters above the log: show one type of hours, a date range, or search your notes.
+- Settings (bottom of page): change the hour goals if your requirements change, and set your
+  residency start date so the weekly average and projected finish date are accurate.
+
+Always confirm the current requirements with the Virginia Board of Counseling. This tracker is
+for your personal records and doesn't replace official forms or your supervisor's sign-off.

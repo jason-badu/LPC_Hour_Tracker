@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LPC Hour Tracker</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1d2330;
+    --muted: #5f6878;
+    --border: #e1e4ea;
+    --accent: #2f6f6a;
+    --accent-text: #ffffff;
+    --danger: #b3261e;
+    --track: #e8ebf0;
+    --client: #2a9d8f;
+    --school: #3d6fd8;
+    --supervision: #8a4fbf;
+    --indirect: #c98a1b;
+    --shadow: 0 1px 2px rgba(20, 30, 50, .06), 0 2px 8px rgba(20, 30, 50, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13161c;
+      --card: #1c2029;
+      --text: #e7e9ee;
+      --muted: #9aa3b2;
+      --border: #2d3340;
+      --accent: #5fb8ae;
+      --accent-text: #0e1513;
+      --danger: #f2827a;
+      --track: #2a303c;
+      --client: #4cc1b2;
+      --school: #6d96ee;
+      --supervision: #b07ddc;
+      --indirect: #e0a93e;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    padding: 28px 16px 8px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  header h1 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 12px 16px 48px;
+    display: grid;
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 17px; }
+  .card h2 small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 6px; }
+
+  /* Progress */
+  .goals { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); }
+  .goal .label { font-size: 13px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .goal .numbers { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; margin: 2px 0 6px; }
+  .goal .numbers span { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .bar { height: 12px; background: var(--track); border-radius: 99px; overflow: hidden; display: flex; }
+  .bar > div { height: 100%; transition: width .4s ease; }
+  .goal .sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .goal .sub strong { color: var(--text); }
+  .done-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--accent); color: var(--accent-text); margin-left: 6px; vertical-align: middle; }
+
+  .breakdown { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .stat .k { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+  .pace { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .pace strong { color: var(--text); }
+
+  .two-col { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 16px; align-items: start; }
+
+  /* Form */
+  form { display: grid; gap: 12px; }
+  label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); }
+  input, select, textarea {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px;
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  textarea { resize: vertical; min-height: 64px; }
+  .type-picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .type-picker input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .type-picker label {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px; cursor: pointer; color: var(--text); font-weight: 500;
+  }
+  .type-picker input:checked + label { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .type-picker input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; }
+  .quick button { padding: 4px 10px; font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    padding: 9px 14px;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger { color: var(--danger); }
+  button.link { border: none; background: none; padding: 2px 6px; color: var(--accent); font-size: 13px; }
+  button.link.danger { color: var(--danger); }
+  .form-actions { display: flex; gap: 8px; }
+  .form-actions .primary { flex: 1; }
+
+  /* Chart */
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 180px; padding-top: 8px; }
+  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: stretch; height: 100%; min-width: 0; }
+  .chart .stack { flex: 1; display: flex; flex-direction: column-reverse; justify-content: flex-start; border-radius: 4px 4px 0 0; overflow: hidden; }
+  .chart .stack > div { width: 100%; }
+  .chart .total { font-size: 11px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; height: 16px; }
+  .chart .xl { font-size: 11px; text-align: center; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+  /* Log */
+  .log-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .log-tools > * { width: auto; flex: 1 1 140px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.notes { color: var(--muted); max-width: 320px; overflow-wrap: anywhere; }
+  td.actions { white-space: nowrap; text-align: right; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .empty { text-align: center; color: var(--muted); padding: 28px 0; }
+  .log-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+  /* Backup */
+  .backup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .backup-status { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+  .backup-status.warn { color: var(--danger); }
+  details summary { cursor: pointer; font-weight: 600; margin-top: 16px; }
+  .settings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 8px;
+    opacity: 0; pointer-events: none; transition: all .25s ease; font-size: 14px; max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    .two-col { grid-template-columns: 1fr; }
+    .goals { grid-template-columns: 1fr; }
+    .breakdown { grid-template-columns: repeat(2, 1fr); }
+    .settings { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    th.notes-h, td.notes { display: none; }
+  }
+  @media print {
+    body { background: #fff; color: #000; }
+    .no-print, .toast { display: none !important; }
+    .card { box-shadow: none; border-color: #ccc; break-inside: avoid; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LPC Residency Hour Tracker</h1>
+  <p>Virginia LPC residency &middot; <span id="headerGoal">3,400 total &middot; 2,000 direct client contact &middot; 200 supervision</span></p>
+</header>
+
+<main>
+  <!-- Progress -->
+  <section class="card" aria-labelledby="progressTitle">
+    <h2 id="progressTitle">Progress</h2>
+    <div class="goals">
+      <div class="goal" id="goalTotal"></div>
+      <div class="goal" id="goalDirect"></div>
+      <div class="goal" id="goalSup"></div>
+    </div>
+    <div class="breakdown" id="breakdown"></div>
+    <div class="pace" id="pace"></div>
+  </section>
+
+  <div class="two-col">
+    <!-- Entry form -->
+    <section class="card no-print" aria-labelledby="formTitle">
+      <h2 id="formTitle">Add hours</h2>
+      <form id="entryForm" autocomplete="off">
+        <div>
+          <div class="type-picker" role="radiogroup" aria-label="Type of hours">
+            <input type="radio" name="type" id="t-client" value="client" checked><label for="t-client"><span class="dot" style="background:var(--client)"></span>Clinic client</label>
+            <input type="radio" name="type" id="t-school" value="school"><label for="t-school"><span class="dot" style="background:var(--school)"></span>School counseling</label>
+            <input type="radio" name="type" id="t-supervision" value="supervision"><label for="t-supervision"><span class="dot" style="background:var(--supervision)"></span>Supervision</label>
+            <input type="radio" name="type" id="t-indirect" value="indirect"><label for="t-indirect"><span class="dot" style="background:var(--indirect)"></span>Other / indirect</label>
+          </div>
+          <div class="hint" id="typeHint" style="margin-top:6px"></div>
+        </div>
+
+        <div class="row">
+          <label>Date
+            <input type="date" id="date" required>
+          </label>
+          <label>Hours
+            <input type="number" id="hours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5" required inputmode="decimal">
+          </label>
+        </div>
+        <div class="quick" aria-label="Quick hours">
+          <button type="button" data-h="0.5">0.5</button>
+          <button type="button" data-h="1">1</button>
+          <button type="button" data-h="2">2</button>
+          <button type="button" data-h="4">4</button>
+          <button type="button" data-h="6">6</button>
+          <button type="button" data-h="8">8</button>
+        </div>
+
+        <label id="supFormatWrap" hidden>Supervision format
+          <select id="supFormat">
+            <option value="individual">Individual</option>
+            <option value="group">Group</option>
+          </select>
+        </label>
+
+        <label>Notes <span class="hint">(optional &mdash; e.g. supervisor, site, # of clients; no client names)</span>
+          <textarea id="notes" maxlength="500"></textarea>
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" class="primary" id="submitBtn">Add to log</button>
+          <button type="button" id="cancelEdit" hidden>Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Weekly chart -->
+    <section class="card" aria-labelledby="chartTitle">
+      <h2 id="chartTitle">Hours per week <small>last 12 weeks</small></h2>
+      <div class="chart" id="chart"></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--client)"></span>Clinic client</span>
+        <span><span class="dot" style="background:var(--school)"></span>School counseling</span>
+        <span><span class="dot" style="background:var(--supervision)"></span>Supervision</span>
+        <span><span class="dot" style="background:var(--indirect)"></span>Other / indirect</span>
+      </div>
+      <div class="pace" id="weekSummary"></div>
+    </section>
+  </div>
+
+  <!-- Log -->
+  <section class="card" aria-labelledby="logTitle">
+    <h2 id="logTitle">Hour log</h2>
+    <div class="log-tools no-print">
+      <select id="fType" aria-label="Filter by type">
+        <option value="">All types</option>
+        <option value="client">Clinic client</option>
+        <option value="school">School counseling</option>
+        <option value="supervision">Supervision</option>
+        <option value="indirect">Other / indirect</option>
+      </select>
+      <input type="date" id="fFrom" aria-label="From date" title="From date">
+      <input type="date" id="fTo" aria-label="To date" title="To date">
+      <input type="search" id="fText" placeholder="Search notes" aria-label="Search notes">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th class="num">Hours</th>
+            <th class="notes-h">Notes</th>
+            <th class="no-print"></th>
+          </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+    <div class="log-footer">
+      <span id="logCount"></span>
+      <span id="logSum"></span>
+    </div>
+  </section>
+
+  <!-- Backup & settings -->
+  <section class="card no-print" aria-labelledby="backupTitle">
+    <h2 id="backupTitle">Backup &amp; export</h2>
+    <p class="backup-status" id="backupStatus"></p>
+    <div class="backup-actions">
+      <button type="button" class="primary" id="btnBackup">Download backup</button>
+      <button type="button" id="btnRestore">Restore from backup&hellip;</button>
+      <button type="button" id="btnCsv">Export to spreadsheet (CSV)</button>
+      <button type="button" id="btnPrint">Print / save as PDF</button>
+      <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+    </div>
+
+    <details>
+      <summary>Settings</summary>
+      <div class="settings">
+        <label>Total hours goal <input type="number" id="sTotal" min="1" step="1"></label>
+        <label>Direct client goal <input type="number" id="sDirect" min="1" step="1"></label>
+        <label>Supervision goal <input type="number" id="sSup" min="1" step="1"></label>
+        <label>Residency start date <input type="date" id="sStart"></label>
+      </div>
+      <p class="hint">The start date is used to estimate your weekly pace and projected finish date. If left blank, the date of your first entry is used.</p>
+      <button type="button" class="danger" id="btnClear">Delete all entries&hellip;</button>
+    </details>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STORAGE_KEY = 'lpcHourTracker.v1';
+  var TYPES = {
+    client:      { label: 'Clinic client',     color: 'var(--client)',      direct: true,
+                   hint: 'Counts toward direct client contact and total hours.' },
+    school:      { label: 'School counseling', color: 'var(--school)',      direct: true,
+                   hint: 'Counts toward direct client contact and total hours.' },
+    supervision: { label: 'Supervision',       color: 'var(--supervision)', direct: false,
+                   hint: 'Counts toward supervision and total hours.' },
+    indirect:    { label: 'Other / indirect',  color: 'var(--indirect)',    direct: false,
+                   hint: 'Notes, paperwork, trainings, etc. Counts toward total hours only.' }
+  };
+  var TYPE_ORDER = ['client', 'school', 'supervision', 'indirect'];
+  var DEFAULT_SETTINGS = { totalGoal: 3400, directGoal: 2000, supGoal: 200, startDate: '' };
+
+  var state = load();
+  var editingId = null;
+
+  // ---------- storage ----------
+  function load() {
+    var data = null;
+    try { data = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch (e) { /* ignore */ }
+    return normalize(data);
+  }
+  function normalize(data) {
+    data = data && typeof data === 'object' ? data : {};
+    var entries = Array.isArray(data.entries) ? data.entries.filter(function (e) {
+      return e && TYPES[e.type] && /^\d{4}-\d{2}-\d{2}$/.test(e.date) && isFinite(e.hours) && e.hours > 0;
+    }).map(function (e) {
+      return {
+        id: String(e.id || uid()),
+        date: e.date,
+        type: e.type,
+        hours: round2(Number(e.hours)),
+        supFormat: e.type === 'supervision' ? (e.supFormat === 'group' ? 'group' : 'individual') : undefined,
+        notes: typeof e.notes === 'string' ? e.notes : '',
+        created: e.created || new Date().toISOString()
+      };
+    }) : [];
+    var s = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
+    return { entries: entries, settings: s, lastBackup: data.lastBackup || '' };
+  }
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+      toast('Could not save — your browser may be blocking storage. Download a backup!');
+    }
+  }
+
+  // ---------- helpers ----------
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function round2(n) { return Math.round(n * 100) / 100; }
+  function fmt(n) { return round2(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function toISO(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parseISO(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function today() { return toISO(new Date()); }
+  function prettyDate(s, opts) {
+    return parseISO(s).toLocaleDateString(undefined, opts || { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function weekStart(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function $(id) { return document.getElementById(id); }
+  var toastTimer;
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+
+  function totals() {
+    var t = { client: 0, school: 0, supervision: 0, indirect: 0, supIndividual: 0, supGroup: 0 };
+    state.entries.forEach(function (e) {
+      t[e.type] += e.hours;
+      if (e.type === 'supervision') {
+        if (e.supFormat === 'group') t.supGroup += e.hours; else t.supIndividual += e.hours;
+      }
+    });
+    t.direct = t.client + t.school;
+    t.total = t.direct + t.supervision + t.indirect;
+    return t;
+  }
+
+  // ---------- render: progress ----------
+  function goalHTML(label, value, goal, segments, extra) {
+    var pct = goal > 0 ? Math.min(100, value / goal * 100) : 0;
+    var remaining = Math.max(0, goal - value);
+    var bars = segments.map(function (s) {
+      var w = goal > 0 ? Math.min(100, s.value / goal * 100) : 0;
+      return '<div style="width:' + w + '%;background:' + s.color + '" title="' + esc(s.label + ': ' + fmt(s.value) + ' hrs') + '"></div>';
+    }).join('');
+    return '<div class="label">' + esc(label) + (value >= goal ? '<span class="done-badge">Complete</span>' : '') + '</div>' +
+      '<div class="numbers">' + fmt(value) + ' <span>/ ' + fmt(goal) + ' hrs</span></div>' +
+      '<div class="bar" role="progressbar" aria-label="' + esc(label) + '" aria-valuemin="0" aria-valuemax="' + goal + '" aria-valuenow="' + round2(value) + '">' + bars + '</div>' +
+      '<div class="sub"><strong>' + Math.floor(pct) + '%</strong> complete &middot; ' +
+      (remaining > 0 ? '<strong>' + fmt(remaining) + '</strong> hrs to go' : 'goal met') +
+      (extra ? '<br>' + extra : '') + '</div>';
+  }
+
+  function renderProgress() {
+    var s = state.settings, t = totals();
+    $('headerGoal').textContent = fmt(s.totalGoal) + ' total · ' + fmt(s.directGoal) +
+      ' direct client contact · ' + fmt(s.supGoal) + ' supervision';
+
+    $('goalTotal').innerHTML = goalHTML('Total residency hours', t.total, s.totalGoal,
+      TYPE_ORDER.map(function (k) { return { label: TYPES[k].label, value: t[k], color: TYPES[k].color }; }));
+    $('goalDirect').innerHTML = goalHTML('Direct client contact', t.direct, s.directGoal, [
+      { label: 'Clinic client', value: t.client, color: TYPES.client.color },
+      { label: 'School counseling', value: t.school, color: TYPES.school.color }
+    ]);
+    $('goalSup').innerHTML = goalHTML('Supervision', t.supervision, s.supGoal,
+      [{ label: 'Supervision', value: t.supervision, color: TYPES.supervision.color }],
+      fmt(t.supIndividual) + ' individual &middot; ' + fmt(t.supGroup) + ' group');
+
+    $('breakdown').innerHTML = TYPE_ORDER.map(function (k) {
+      return '<div class="stat"><div class="k"><span class="dot" style="background:' + TYPES[k].color + '"></span>' +
+        esc(TYPES[k].label) + '</div><div class="v">' + fmt(t[k]) + '</div></div>';
+    }).join('');
+
+    // Pace & projection
+    var pace = $('pace');
+    if (!state.entries.length) {
+      pace.innerHTML = 'Add your first entry below to start tracking your pace.';
+      return;
+    }
+    var first = state.entries.reduce(function (m, e) { return e.date < m ? e.date : m; }, state.entries[0].date);
+    var start = s.startDate || first;
+    var days = Math.max(7, (parseISO(today()) - parseISO(start)) / 864e5 + 1);
+    var perWeek = t.total / (days / 7);
+    var html = 'Averaging <strong>' + fmt(perWeek) + ' hrs/week</strong> since ' + esc(prettyDate(start)) + '.';
+    var remainTotal = Math.max(0, s.totalGoal - t.total);
+    var directPerWeek = t.direct / (days / 7);
+    var remainDirect = Math.max(0, s.directGoal - t.direct);
+    var weeksNeeded = Math.max(
+      perWeek > 0 ? remainTotal / perWeek : Infinity,
+      remainDirect > 0 ? (directPerWeek > 0 ? remainDirect / directPerWeek : Infinity) : 0
+    );
+    if (remainTotal === 0 && remainDirect === 0 && t.supervision >= s.supGoal) {
+      html += ' <strong>All hour requirements met — congratulations!</strong>';
+    } else if (isFinite(weeksNeeded) && weeksNeeded > 0) {
+      var finish = new Date();
+      finish.setDate(finish.getDate() + Math.ceil(weeksNeeded * 7));
+      html += ' At this pace you’ll reach your total and direct-contact goals around <strong>' +
+        esc(finish.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })) + '</strong>.';
+    }
+    pace.innerHTML = html;
+  }
+
+  // ---------- render: weekly chart ----------
+  function renderChart() {
+    var weeks = [];
+    var cur = weekStart(new Date());
+    for (var i = 11; i >= 0; i--) {
+      var d = new Date(cur); d.setDate(d.getDate() - i * 7);
+      weeks.push({ key: toISO(d), date: d, client: 0, school: 0, supervision: 0, indirect: 0, total: 0 });
+    }
+    var byKey = {};
+    weeks.forEach(function (w) { byKey[w.key] = w; });
+    state.entries.forEach(function (e) {
+      var w = byKey[toISO(weekStart(parseISO(e.date)))];
+      if (w) { w[e.type] += e.hours; w.total += e.hours; }
+    });
+    var max = Math.max(10, Math.max.apply(null, weeks.map(function (w) { return w.total; })));
+    $('chart').innerHTML = weeks.map(function (w) {
+      var segs = TYPE_ORDER.map(function (k) {
+        return w[k] > 0 ? '<div style="height:' + (w[k] / max * 100) + '%;background:' + TYPES[k].color + '" title="' +
+          esc(TYPES[k].label + ': ' + fmt(w[k]) + ' hrs') + '"></div>' : '';
+      }).join('');
+      return '<div class="col" title="Week of ' + esc(prettyDate(w.key)) + ': ' + fmt(w.total) + ' hrs">' +
+        '<div class="total">' + (w.total ? fmt(w.total) : '') + '</div>' +
+        '<div class="stack">' + segs + '</div>' +
+        '<div class="xl">' + esc(w.date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })) + '</div></div>';
+    }).join('');
+    var thisWeek = weeks[weeks.length - 1];
+    $('weekSummary').innerHTML = 'This week: <strong>' + fmt(thisWeek.total) + ' hrs</strong> (' +
+      fmt(thisWeek.client + thisWeek.school) + ' direct, ' + fmt(thisWeek.supervision) + ' supervision).';
+  }
+
+  // ---------- render: log ----------
+  function filteredEntries() {
+    var fType = $('fType').value, from = $('fFrom').value, to = $('fTo').value;
+    var q = $('fText').value.trim().toLowerCase();
+    return state.entries.filter(function (e) {
+      return (!fType || e.type === fType) && (!from || e.date >= from) && (!to || e.date <= to) &&
+        (!q || e.notes.toLowerCase().indexOf(q) !== -1);
+    }).sort(function (a, b) {
+      return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created < b.created ? 1 : -1);
+    });
+  }
+
+  function renderLog() {
+    var list = filteredEntries();
+    var body = $('logBody');
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty">' +
+        (state.entries.length ? 'No entries match these filters.' : 'No hours logged yet. Add your first entry above.') + '</td></tr>';
+    } else {
+      body.innerHTML = list.map(function (e) {
+        var T = TYPES[e.type];
+        var typeLabel = T.label + (e.type === 'supervision' ? ' (' + (e.supFormat === 'group' ? 'group' : 'individual') + ')' : '');
+        return '<tr>' +
+          '<td style="white-space:nowrap">' + esc(prettyDate(e.date)) + '</td>' +
+          '<td><span class="pill"><span class="dot" style="background:' + T.color + '"></span>' + esc(typeLabel) + '</span></td>' +
+          '<td class="num">' + fmt(e.hours) + '</td>' +
+          '<td class="notes">' + esc(e.notes) + '</td>' +
+          '<td class="actions no-print">' +
+            '<button type="button" class="link" data-edit="' + esc(e.id) + '">Edit</button>' +
+            '<button type="button" class="link danger" data-del="' + esc(e.id) + '">Delete</button>' +
+          '</td></tr>';
+      }).join('');
+    }
+    var sum = list.reduce(function (a, e) { return a + e.hours; }, 0);
+    $('logCount').textContent = list.length + ' of ' + state.entries.length + ' entries';
+    $('logSum').textContent = 'Shown: ' + fmt(sum) + ' hrs';
+  }
+
+  function renderBackup() {
+    var el = $('backupStatus');
+    var n = state.entries.length;
+    if (!n) {
+      el.className = 'backup-status';
+      el.textContent = 'Your hours are saved automatically in this browser on this computer. Download a backup now and then so nothing is ever lost.';
+      return;
+    }
+    if (!state.lastBackup) {
+      el.className = 'backup-status warn';
+      el.textContent = 'You haven’t downloaded a backup yet. Hours are saved only in this browser — click "Download backup" to keep a safe copy.';
+      return;
+    }
+    var daysAgo = Math.floor((Date.now() - new Date(state.lastBackup).getTime()) / 864e5);
+    el.className = 'backup-status' + (daysAgo >= 14 ? ' warn' : '');
+    el.textContent = 'Last backup: ' + new Date(state.lastBackup).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }) +
+      (daysAgo >= 14 ? ' — it’s been a while, consider downloading a fresh one.' : '.');
+  }
+
+  function renderSettings() {
+    $('sTotal').value = state.settings.totalGoal;
+    $('sDirect').value = state.settings.directGoal;
+    $('sSup').value = state.settings.supGoal;
+    $('sStart').value = state.settings.startDate || '';
+  }
+
+  function renderAll() {
+    renderProgress();
+    renderChart();
+    renderLog();
+    renderBackup();
+  }
+
+  // ---------- form ----------
+  function selectedType() { return document.querySelector('input[name="type"]:checked').value; }
+  function onTypeChange() {
+    var t = selectedType();
+    $('typeHint').textContent = TYPES[t].hint;
+    $('supFormatWrap').hidden = t !== 'supervision';
+  }
+  function resetForm(keepDate) {
+    var d = $('date').value;
+    $('entryForm').reset();
+    $('date').value = keepDate && d ? d : today();
+    editingId = null;
+    $('submitBtn').textContent = 'Add to log';
+    $('formTitle').textContent = 'Add hours';
+    $('cancelEdit').hidden = true;
+    onTypeChange();
+  }
+  function startEdit(id) {
+    var e = state.entries.find(function (x) { return x.id === id; });
+    if (!e) return;
+    editingId = id;
+    $('t-' + e.type).checked = true;
+    $('date').value = e.date;
+    $('hours').value = e.hours;
+    $('notes').value = e.notes;
+    $('supFormat').value = e.supFormat || 'individual';
+    $('submitBtn').textContent = 'Save changes';
+    $('formTitle').textContent = 'Edit entry';
+    $('cancelEdit').hidden = false;
+    onTypeChange();
+    $('entryForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('hours').focus({ preventScroll: true });
+  }
+
+  $('entryForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var type = selectedType();
+    var date = $('date').value;
+    var hours = round2(parseFloat($('hours').value));
+    if (!date) { toast('Please choose a date.'); return; }
+    if (!(hours > 0) || hours > 24) { toast('Hours must be between 0.25 and 24.'); return; }
+    var data = {
+      date: date, type: type, hours: hours,
+      supFormat: type === 'supervision' ? $('supFormat').value : undefined,
+      notes: $('notes').value.trim()
+    };
+    if (editingId) {
+      var e = state.entries.find(function (x) { return x.id === editingId; });
+      if (e) Object.assign(e, data);
+      toast('Entry updated.');
+    } else {
+      data.id = uid();
+      data.created = new Date().toISOString();
+      state.entries.push(data);
+      toast('Added ' + fmt(hours) + ' ' + TYPES[type].label.toLowerCase() + ' hr' + (hours === 1 ? '' : 's') + ' on ' + prettyDate(date) + '.');
+    }
+    save();
+    resetForm(true);
+    renderAll();
+  });
+  $('cancelEdit').addEventListener('click', function () { resetForm(false); });
+  document.querySelectorAll('input[name="type"]').forEach(function (r) { r.addEventListener('change', onTypeChange); });
+  document.querySelectorAll('.quick button').forEach(function (b) {
+    b.addEventListener('click', function () { $('hours').value = b.getAttribute('data-h'); $('hours').focus(); });
+  });
+
+  $('logBody').addEventListener('click', function (ev) {
+    var btn = ev.target.closest('button');
+    if (!btn) return;
+    var editId = btn.getAttribute('data-edit');
+    var delId = btn.getAttribute('data-del');
+    if (editId) startEdit(editId);
+    if (delId) {
+      var e = state.entries.find(function (x) { return x.id === delId; });
+      if (!e) return;
+      if (!confirm('Delete ' + fmt(e.hours) + ' ' + TYPES[e.type].label.toLowerCase() + ' hours on ' + prettyDate(e.date) + '?')) return;
+      state.entries = state.entries.filter(function (x) { return x.id !== delId; });
+      if (editingId === delId) resetForm(false);
+      save();
+      renderAll();
+      toast('Entry deleted.');
+    }
+  });
+
+  ['fType', 'fFrom', 'fTo', 'fText'].forEach(function (id) { $(id).addEventListener('input', renderLog); });
+
+  // ---------- settings ----------
+  function bindSetting(id, key, isNum) {
+    $(id).addEventListener('change', function () {
+      var v = $(id).value;
+      if (isNum) {
+        v = Math.round(Number(v));
+        if (!(v > 0)) { renderSettings(); return; }
+      }
+      state.settings[key] = v;
+      save();
+      renderAll();
+      toast('Settings saved.');
+    });
+  }
+  bindSetting('sTotal', 'totalGoal', true);
+  bindSetting('sDirect', 'directGoal', true);
+  bindSetting('sSup', 'supGoal', true);
+  bindSetting('sStart', 'startDate', false);
+
+  $('btnClear').addEventListener('click', function () {
+    if (!state.entries.length) { toast('There are no entries to delete.'); return; }
+    if (!confirm('Delete ALL ' + state.entries.length + ' entries? Download a backup first if you might want them back.')) return;
+    if (!confirm('Are you sure? This cannot be undone.')) return;
+    state.entries = [];
+    save();
+    resetForm(false);
+    renderAll();
+    toast('All entries deleted.');
+  });
+
+  // ---------- backup / export ----------
+  function download(filename, content, mime) {
+    var blob = new Blob([content], { type: mime });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  }
+
+  $('btnBackup').addEventListener('click', function () {
+    state.lastBackup = new Date().toISOString();
+    save();
+    var payload = { app: 'LPC Hour Tracker', version: 1, exported: state.lastBackup, settings: state.settings, entries: state.entries };
+    download('LPC-hours-backup-' + today() + '.json', JSON.stringify(payload, null, 2), 'application/json');
+    renderBackup();
+    toast('Backup downloaded. Keep it somewhere safe (email, cloud drive, etc.).');
+  });
+
+  $('btnRestore').addEventListener('click', function () { $('restoreFile').click(); });
+  $('restoreFile').addEventListener('change', function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var data;
+      try { data = JSON.parse(reader.result); } catch (e) { toast('That file isn’t a valid backup.'); return; }
+      var incoming = normalize(data);
+      if (!incoming.entries.length && !(data && Array.isArray(data.entries))) { toast('That file isn’t a valid backup.'); return; }
+      var msg = 'This backup has ' + incoming.entries.length + ' entries.\n\n' +
+        'OK = Replace everything currently here with the backup\nCancel = Don’t restore';
+      if (!confirm(msg)) return;
+      state.entries = incoming.entries;
+      state.settings = incoming.settings;
+      save();
+      renderSettings();
+      resetForm(false);
+      renderAll();
+      toast('Restored ' + incoming.entries.length + ' entries.');
+    };
+    reader.readAsText(file);
+  });
+
+  $('btnCsv').addEventListener('click', function () {
+    function cell(v) { v = String(v == null ? '' : v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+    var rows = [['Date', 'Type', 'Supervision format', 'Hours', 'Counts as direct client contact', 'Notes']];
+    state.entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).forEach(function (e) {
+      rows.push([e.date, TYPES[e.type].label, e.type === 'supervision' ? e.supFormat : '', e.hours, TYPES[e.type].direct ? 'Yes' : 'No', e.notes]);
+    });
+    var t = totals();
+    rows.push([]);
+    rows.push(['Totals']);
+    rows.push(['Total hours', '', '', round2(t.total)]);
+    rows.push(['Direct client contact', '', '', round2(t.direct)]);
+    rows.push(['Supervision', '', '', round2(t.supervision)]);
+    var csv = rows.map(function (r) { return r.map(cell).join(','); }).join('\r\n');
+    download('LPC-hours-' + today() + '.csv', '﻿' + csv, 'text/csv;charset=utf-8');
+    toast('Spreadsheet downloaded.');
+  });
+
+  $('btnPrint').addEventListener('click', function () { window.print(); });
+
+  // ---------- init ----------
+  resetForm(false);
+  renderSettings();
+  renderAll();
+})();
+</script>
+</body>
+</html>
