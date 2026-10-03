@@ -16,6 +16,9 @@ LOGGING HOURS
    - Other / indirect   -> counts toward the total (3,400) only. Use this for notes, paperwork,
                            trainings, and other residency work that isn't face-to-face with clients.
 2. Pick the date and enter the hours (use decimals: 0.25 = 15 min, 0.5 = 30 min, 0.75 = 45 min).
+   Logging a whole week at once? Switch to "Date range", pick the From and To dates (or click
+   "This week" / "Last week" for Mon-Fri), and enter the TOTAL hours, e.g. 40. It's saved as one
+   entry in your log.
 3. Add an optional note (supervisor, site, number of clients). Don't put client names in notes.
 4. Click "Add to log". Everything saves automatically.
 

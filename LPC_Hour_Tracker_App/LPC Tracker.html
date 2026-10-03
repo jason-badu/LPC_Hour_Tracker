@@ -118,6 +118,11 @@
   }
   .type-picker input:checked + label { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .type-picker input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .segmented { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; background: var(--bg); }
+  .segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .segmented label { text-align: center; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: 14px; display: block; }
+  .segmented input:checked + label { background: var(--card); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+  .segmented input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .quick { display: flex; gap: 6px; flex-wrap: wrap; }
   .quick button { padding: 4px 10px; font-size: 13px; }
@@ -231,21 +236,40 @@
           <div class="hint" id="typeHint" style="margin-top:6px"></div>
         </div>
 
+        <div class="segmented" role="radiogroup" aria-label="Day or date range">
+          <input type="radio" name="mode" id="m-day" value="day" checked><label for="m-day">One day</label>
+          <input type="radio" name="mode" id="m-range" value="range"><label for="m-range">Date range</label>
+        </div>
+
         <div class="row">
-          <label>Date
+          <label><span id="dateLabel">Date</span>
             <input type="date" id="date" required>
           </label>
-          <label>Hours
-            <input type="number" id="hours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5" required inputmode="decimal">
+          <label id="endDateWrap" hidden>To
+            <input type="date" id="endDate">
           </label>
         </div>
-        <div class="quick" aria-label="Quick hours">
+        <div class="quick" id="rangeQuick" aria-label="Quick date ranges" hidden>
+          <button type="button" data-range="this">This week (Mon&ndash;Fri)</button>
+          <button type="button" data-range="last">Last week (Mon&ndash;Fri)</button>
+        </div>
+
+        <label><span id="hoursLabel">Hours</span>
+          <input type="number" id="hours" min="0.25" max="24" step="0.25" placeholder="e.g. 1.5" required inputmode="decimal">
+        </label>
+        <div class="quick" id="dayHours" aria-label="Quick hours">
           <button type="button" data-h="0.5">0.5</button>
           <button type="button" data-h="1">1</button>
           <button type="button" data-h="2">2</button>
           <button type="button" data-h="4">4</button>
           <button type="button" data-h="6">6</button>
           <button type="button" data-h="8">8</button>
+        </div>
+        <div class="quick" id="rangeHours" aria-label="Quick total hours" hidden>
+          <button type="button" data-h="10">10</button>
+          <button type="button" data-h="20">20</button>
+          <button type="button" data-h="30">30</button>
+          <button type="button" data-h="40">40</button>
         </div>
 
         <label id="supFormatWrap" hidden>Supervision format
@@ -378,6 +402,7 @@
       return {
         id: String(e.id || uid()),
         date: e.date,
+        endDate: typeof e.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.endDate) && e.endDate > e.date ? e.endDate : undefined,
         type: e.type,
         hours: round2(Number(e.hours)),
         supFormat: e.type === 'supervision' ? (e.supFormat === 'group' ? 'group' : 'individual') : undefined,
@@ -406,6 +431,18 @@
   function today() { return toISO(new Date()); }
   function prettyDate(s, opts) {
     return parseISO(s).toLocaleDateString(undefined, opts || { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  function endOf(e) { return e.endDate || e.date; }
+  function daysBetween(a, b) { return Math.round((parseISO(b) - parseISO(a)) / 864e5) + 1; }
+  function entryDateLabel(e) {
+    if (!e.endDate) return prettyDate(e.date);
+    var a = parseISO(e.date), b = parseISO(e.endDate);
+    if (a.getFullYear() === b.getFullYear()) {
+      var md = { month: 'short', day: 'numeric' };
+      var endPart = a.getMonth() === b.getMonth() ? b.getDate() : b.toLocaleDateString(undefined, md);
+      return a.toLocaleDateString(undefined, md) + ' \u2013 ' + endPart + ', ' + b.getFullYear();
+    }
+    return prettyDate(e.date) + ' \u2013 ' + prettyDate(e.endDate);
   }
   function weekStart(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
   function esc(s) {
@@ -512,8 +549,13 @@
     var byKey = {};
     weeks.forEach(function (w) { byKey[w.key] = w; });
     state.entries.forEach(function (e) {
-      var w = byKey[toISO(weekStart(parseISO(e.date)))];
-      if (w) { w[e.type] += e.hours; w.total += e.hours; }
+      // A date-range entry is spread evenly across each day in the range.
+      var n = daysBetween(e.date, endOf(e)), perDay = e.hours / n, d = parseISO(e.date);
+      for (var i = 0; i < n; i++) {
+        var w = byKey[toISO(weekStart(d))];
+        if (w) { w[e.type] += perDay; w.total += perDay; }
+        d.setDate(d.getDate() + 1);
+      }
     });
     var max = Math.max(10, Math.max.apply(null, weeks.map(function (w) { return w.total; })));
     $('chart').innerHTML = weeks.map(function (w) {
@@ -536,7 +578,7 @@
     var fType = $('fType').value, from = $('fFrom').value, to = $('fTo').value;
     var q = $('fText').value.trim().toLowerCase();
     return state.entries.filter(function (e) {
-      return (!fType || e.type === fType) && (!from || e.date >= from) && (!to || e.date <= to) &&
+      return (!fType || e.type === fType) && (!from || endOf(e) >= from) && (!to || e.date <= to) &&
         (!q || e.notes.toLowerCase().indexOf(q) !== -1);
     }).sort(function (a, b) {
       return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.created < b.created ? 1 : -1);
@@ -554,7 +596,7 @@
         var T = TYPES[e.type];
         var typeLabel = T.label + (e.type === 'supervision' ? ' (' + (e.supFormat === 'group' ? 'group' : 'individual') + ')' : '');
         return '<tr>' +
-          '<td style="white-space:nowrap">' + esc(prettyDate(e.date)) + '</td>' +
+          '<td style="white-space:nowrap">' + esc(entryDateLabel(e)) + '</td>' +
           '<td><span class="pill"><span class="dot" style="background:' + T.color + '"></span>' + esc(typeLabel) + '</span></td>' +
           '<td class="num">' + fmt(e.hours) + '</td>' +
           '<td class="notes">' + esc(e.notes) + '</td>' +
@@ -604,27 +646,61 @@
 
   // ---------- form ----------
   function selectedType() { return document.querySelector('input[name="type"]:checked').value; }
+  function isRange() { return $('m-range').checked; }
   function onTypeChange() {
     var t = selectedType();
     $('typeHint').textContent = TYPES[t].hint;
     $('supFormatWrap').hidden = t !== 'supervision';
   }
+  function onModeChange() {
+    var range = isRange();
+    $('endDateWrap').hidden = !range;
+    $('rangeQuick').hidden = !range;
+    $('rangeHours').hidden = !range;
+    $('dayHours').hidden = range;
+    $('endDate').required = range;
+    $('dateLabel').textContent = range ? 'From' : 'Date';
+    $('hoursLabel').textContent = range ? 'Total hours for these dates' : 'Hours';
+    $('hours').placeholder = range ? 'e.g. 40' : 'e.g. 1.5';
+    if (range && !$('endDate').value && $('date').value) $('endDate').value = $('date').value;
+    updateHoursMax();
+  }
+  function updateHoursMax() {
+    var a = $('date').value, b = $('endDate').value;
+    var n = isRange() && a && b && b >= a ? daysBetween(a, b) : 1;
+    $('hours').max = 24 * n;
+  }
+  function setWeek(offsetWeeks) {
+    var mon = weekStart(new Date());
+    mon.setDate(mon.getDate() + offsetWeeks * 7);
+    var fri = new Date(mon); fri.setDate(fri.getDate() + 4);
+    $('date').value = toISO(mon);
+    $('endDate').value = toISO(fri);
+    updateHoursMax();
+  }
   function resetForm(keepDate) {
-    var d = $('date').value;
+    var d = $('date').value, end = $('endDate').value, range = isRange();
     $('entryForm').reset();
     $('date').value = keepDate && d ? d : today();
+    if (keepDate) {
+      $('m-' + (range ? 'range' : 'day')).checked = true;
+      $('endDate').value = range ? end : '';
+    }
     editingId = null;
     $('submitBtn').textContent = 'Add to log';
     $('formTitle').textContent = 'Add hours';
     $('cancelEdit').hidden = true;
     onTypeChange();
+    onModeChange();
   }
   function startEdit(id) {
     var e = state.entries.find(function (x) { return x.id === id; });
     if (!e) return;
     editingId = id;
     $('t-' + e.type).checked = true;
+    $('m-' + (e.endDate ? 'range' : 'day')).checked = true;
     $('date').value = e.date;
+    $('endDate').value = e.endDate || '';
     $('hours').value = e.hours;
     $('notes').value = e.notes;
     $('supFormat').value = e.supFormat || 'individual';
@@ -632,6 +708,7 @@
     $('formTitle').textContent = 'Edit entry';
     $('cancelEdit').hidden = false;
     onTypeChange();
+    onModeChange();
     $('entryForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
     $('hours').focus({ preventScroll: true });
   }
@@ -640,11 +717,21 @@
     ev.preventDefault();
     var type = selectedType();
     var date = $('date').value;
+    var endDate = isRange() ? $('endDate').value : '';
     var hours = round2(parseFloat($('hours').value));
     if (!date) { toast('Please choose a date.'); return; }
-    if (!(hours > 0) || hours > 24) { toast('Hours must be between 0.25 and 24.'); return; }
+    if (isRange()) {
+      if (!endDate) { toast('Please choose an end date.'); return; }
+      if (endDate < date) { toast('The end date must be on or after the start date.'); return; }
+    }
+    if (endDate === date) endDate = '';
+    var days = endDate ? daysBetween(date, endDate) : 1;
+    if (!(hours > 0) || hours > 24 * days) {
+      toast(days > 1 ? 'Hours must be between 0.25 and ' + (24 * days) + ' for ' + days + ' days.' : 'Hours must be between 0.25 and 24.');
+      return;
+    }
     var data = {
-      date: date, type: type, hours: hours,
+      date: date, endDate: endDate || undefined, type: type, hours: hours,
       supFormat: type === 'supervision' ? $('supFormat').value : undefined,
       notes: $('notes').value.trim()
     };
@@ -656,7 +743,8 @@
       data.id = uid();
       data.created = new Date().toISOString();
       state.entries.push(data);
-      toast('Added ' + fmt(hours) + ' ' + TYPES[type].label.toLowerCase() + ' hr' + (hours === 1 ? '' : 's') + ' on ' + prettyDate(date) + '.');
+      toast('Added ' + fmt(hours) + ' ' + TYPES[type].label.toLowerCase() + ' hr' + (hours === 1 ? '' : 's') +
+        (endDate ? ' for ' : ' on ') + entryDateLabel(data) + '.');
     }
     save();
     resetForm(true);
@@ -664,8 +752,13 @@
   });
   $('cancelEdit').addEventListener('click', function () { resetForm(false); });
   document.querySelectorAll('input[name="type"]').forEach(function (r) { r.addEventListener('change', onTypeChange); });
-  document.querySelectorAll('.quick button').forEach(function (b) {
+  document.querySelectorAll('input[name="mode"]').forEach(function (r) { r.addEventListener('change', onModeChange); });
+  ['date', 'endDate'].forEach(function (id) { $(id).addEventListener('input', updateHoursMax); });
+  document.querySelectorAll('[data-h]').forEach(function (b) {
     b.addEventListener('click', function () { $('hours').value = b.getAttribute('data-h'); $('hours').focus(); });
+  });
+  document.querySelectorAll('[data-range]').forEach(function (b) {
+    b.addEventListener('click', function () { setWeek(b.getAttribute('data-range') === 'last' ? -1 : 0); });
   });
 
   $('logBody').addEventListener('click', function (ev) {
@@ -677,7 +770,7 @@
     if (delId) {
       var e = state.entries.find(function (x) { return x.id === delId; });
       if (!e) return;
-      if (!confirm('Delete ' + fmt(e.hours) + ' ' + TYPES[e.type].label.toLowerCase() + ' hours on ' + prettyDate(e.date) + '?')) return;
+      if (!confirm('Delete ' + fmt(e.hours) + ' ' + TYPES[e.type].label.toLowerCase() + ' hours on ' + entryDateLabel(e) + '?')) return;
       state.entries = state.entries.filter(function (x) { return x.id !== delId; });
       if (editingId === delId) resetForm(false);
       save();
@@ -765,16 +858,16 @@
 
   $('btnCsv').addEventListener('click', function () {
     function cell(v) { v = String(v == null ? '' : v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
-    var rows = [['Date', 'Type', 'Supervision format', 'Hours', 'Counts as direct client contact', 'Notes']];
+    var rows = [['Date', 'End date', 'Type', 'Supervision format', 'Hours', 'Counts as direct client contact', 'Notes']];
     state.entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).forEach(function (e) {
-      rows.push([e.date, TYPES[e.type].label, e.type === 'supervision' ? e.supFormat : '', e.hours, TYPES[e.type].direct ? 'Yes' : 'No', e.notes]);
+      rows.push([e.date, e.endDate || '', TYPES[e.type].label, e.type === 'supervision' ? e.supFormat : '', e.hours, TYPES[e.type].direct ? 'Yes' : 'No', e.notes]);
     });
     var t = totals();
     rows.push([]);
     rows.push(['Totals']);
-    rows.push(['Total hours', '', '', round2(t.total)]);
-    rows.push(['Direct client contact', '', '', round2(t.direct)]);
-    rows.push(['Supervision', '', '', round2(t.supervision)]);
+    rows.push(['Total hours', '', '', '', round2(t.total)]);
+    rows.push(['Direct client contact', '', '', '', round2(t.direct)]);
+    rows.push(['Supervision', '', '', '', round2(t.supervision)]);
     var csv = rows.map(function (r) { return r.map(cell).join(','); }).join('\r\n');
     download('LPC-hours-' + today() + '.csv', '﻿' + csv, 'text/csv;charset=utf-8');
     toast('Spreadsheet downloaded.');
