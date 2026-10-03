@@ -3,7 +3,7 @@ LPC RESIDENCY HOUR TRACKER - HOW TO USE
 
 GETTING STARTED
 1. Save this folder somewhere permanent on your computer (for example, Documents).
-2. Double-click "index.html". It opens in your web browser. No internet or installation needed.
+2. Double-click "LPC Tracker.html". It opens in your web browser. No internet or installation needed.
 3. Tip: bookmark the page, or drag it to your bookmarks bar, so it's one click to open.
    Always open it in the same browser (for example, always Chrome) because that's where your hours are saved.
 
